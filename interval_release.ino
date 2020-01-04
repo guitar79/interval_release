@@ -1,254 +1,129 @@
-// GS-touch
-// ONLY FOR USE WITH Biopolar STEPPER MOTORS ONLY
-// LEDS, TEMPERATURE PROBE, OLED
-// REQUIRES 12V 3A Power Supply
+// GS-interval_reliase
+// REQUIRES 6~12V betary
 // ----------------------------------------------------------------------------------------------------------
 // FIRMWARE CHANGE LOG
-// (2019. 10. 1) Ver. 1.0 기초 동작 시작
-// (2019. 10. 1.) Ver. 1.1 박기현 편집 시작 
-// (2019. 11. 14.) Ver. 2.0 프로토콜 변경 
+// (2020. 1. 4) Ver. 0.1 기초 동작 시작
 // ----------------------------------------------------------------------------------------------------------
-// 프로토콜
-//  'B' :  // REVERSE "<"
-//  'b': _newPosition = _currentPosition - _value;
-//  'C':  // FORWARD ">"
-//  'c': _newPosition = _currentPosition + _value;
-//  'E':  // MOVE TO POSITION
-//  'e': _newPosition = _value;
-//  'F':  // GET CURRENT POSITION
-//  'f': _answer += _currentPosition;
-//  'G':  // SET CURRENT POSITION
-//  'g': _newPosition = _value;
-//  'H':  // SET ACCELERATION
-//  'h': _newPosition = _currentPosition; // non move command
-//  'I':  // SET SPEED
-//  'i':  // GET SPEED
-//  'X':  // GET STATUS - may not be needed
-//  'x':
-//  'Z':  // IDENTIFY
-//  'z':  _answer += "GStouch";
-// ----------------------------------------------------------------------------------------------------------
-
-
-//previousMillis = millis();
+#include <U8glib.h>
+U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);  // I2C / TWI 
 
 // 변수 설정
 short subm = 0;
 short menu = 1;
 short power = 1;
 
+// interval_relaese pins
+#define shutter1 5
+#define shutter2 6
+
+//button pins
+#define UPpin 8
+#define DOWNpin 9
+#define RIGHTpin 7
+#define LEFTpin 10
+//about button switch
+short S[4]={0}; short now[4]={1}; short was[4]={0};
+
 //
-short rm = 0;
-//
-short stepmode = 1;
-
-bool PCMODE = false;
-
-// ----------------------------------------------------------------------------------------------------------
-// for the temperature and hubmidity sensor
-#define DHT22_ 1
-#ifdef DHT22_
-  #include <DHT.h>
-  #define DHT22_PIN 2
-  #define DHTTYPE DHT22
-    DHT dht(DHT22_PIN,DHTTYPE);
-    int chkSensor;
-    String Temperature;
-    String Humidity;
-#endif
-
-// DRV8825 Motor driver pins
-#define motorInterfaceType 1
-#define DIR 4
-#define STEP 3
-#define MS0 15
-#define MS1 12
-#define MS2 13
-#define MOTOR_STEPS 200
-
-// Declaration needed for the AccelStepper Library
-// ----------------------------------------------------------------------------------------------------------
-// Accell Stepper liblary
-// https://www.airspayce.com/mikem/arduino/AccelStepper/classAccelStepper.html#a608b2395b64ac15451d16d0371fe13ce
-#include <AccelStepper.h>
-  AccelStepper stepper(motorInterfaceType, STEP, DIR);
-
+int _resetPosition = 0;
 
 String inputString = "";
 
+short val_shutterspeed_ms = 100;
+short val_interval_ms = 100;
+int shooting = 0 ;
+
 void setup() {
   Serial.begin(115200);
-  Serial.println("GStouch#");
+  Serial.println("GS-interval_release#");
   U8G_start();
-  
-  stepper.setMaxSpeed(2000.0);
-  stepper.setAcceleration(300.0);
-  stepper.setSpeed(100);
-
-  inputString.reserve(200);
-  pinset();
+  pinMode(LED_BUILTIN, OUTPUT);
+  // button pins
+  pinMode(UPpin,INPUT_PULLUP);
+  pinMode(DOWNpin,INPUT_PULLUP);
+  pinMode(RIGHTpin,INPUT_PULLUP);
+  pinMode(LEFTpin,INPUT_PULLUP);
+  draw();
 }
 
 void loop() {
-  #ifdef DHT22_
-    if(stepper.distanceToGo() == 0 || subm!=2)
+  buttonRead();
+  RunRelease(); 
+}
+
+void RunRelease() {
+  pinMode(shutter1, OUTPUT); pinMode(shutter2, OUTPUT);
+  digitalWrite(shutter1, HIGH); digitalWrite(shutter2, HIGH);   // turn the LED on (HIGH is the voltage level)
+  delay(val_shutterspeed_ms);                       // wait for a second
+  digitalWrite(shutter1, LOW);   // turn the LED on (HIGH is the voltage level)
+  digitalWrite(shutter2, LOW);   // turn the LED on (HIGH is the voltage level)
+  delay(val_interval_ms); // wait for a second
+  shooting++;
+  Serial.print("Shootint #: ");
+  Serial.print(shooting);
+  Serial.print("    during time : ");
+  Serial.println(millis());
+}
+//Judge buttons
+void controljudge(){
+  now[0]=digitalRead(UPpin);
+  now[1]=digitalRead(DOWNpin);
+  now[2]=digitalRead(RIGHTpin);
+  now[3]=digitalRead(LEFTpin);
+  for(int i=0; i<4; i++)
+  {
+    if(now[i] != was[i] && now[i] == 0) S[i]=1;
+    else S[i] = 0;
+    was[i] = now[i];
+  }
+}
+
+void buttonRead(){
+  controljudge();
+  if(subm != 2)
     {
-      Temperature = String(dht.readTemperature(),1);
-      Humidity = String(dht.readHumidity(),1);
-      humidityTemperatureReport();
-      buttonRead();
-      draw();
+      if(S[2]) subm++;
+      else if(S[3]) subm = 0;
+      
+      if(S[0]&&menu>1) menu--;
+      else if(S[1]&&menu<2) menu++;
     }
-  #endif
-  
-}
-
-void reportPosition() {
-  Serial.print("POSITION:");
-  Serial.print(stepper.currentPosition());
-  Serial.println("#");
-}
-
-/**
-* process the command we recieved from the client
-* command format is <Letter><Space><Integer>
-* i.e. A 500 ---- Fast Rewind with 500 steps
-*/
-void serialCommand(String commandString) {
-  char _command = commandString.charAt(0);
-  int _value = commandString.substring(2).toInt();
-  String _answer = "";
-  int _currentPosition = stepper.currentPosition();
-  int _newPosition = _currentPosition;
-  
-  switch (_command) {
-    
-  case 'B':  // REVERSE "<"
-  case 'b': _newPosition = _currentPosition - _value;
-    break;
-    
-  case 'C':  // FORWARD ">"
-  case 'c': _newPosition = _currentPosition + _value;
-    break;
-    
-  case 'E':  // MOVE TO POSITION
-  case 'e': _newPosition = _value;
-    break;
-    
-  case 'F':  // GET CURRENT POSITION
-  case 'f': _answer += _currentPosition;
-    break;
-  
-  case 'G':  // SET CURRENT POSITION
-  case 'g': _newPosition = _value;
-    _currentPosition = _value;
-    stepper.setCurrentPosition(_value);
-    break;
-  case 'H':  // SET ACCELERATION
-  case 'h': _newPosition = _currentPosition; // non move command
-    stepper.setAcceleration(_value);
-    _answer += "SET-ACCELERATION:";
-    _answer += _value;
-    break;
-  case 'I':  // SET SPEED
-    _newPosition = _currentPosition; // non move command
-    stepper.setSpeed(_value);
-    _answer += "SET-SPEED:";
-    _answer += _value;
-    break;
-  case 'i':  // GET SPEED
-    _newPosition = _currentPosition; // non move command
-    _answer += "GET-SPEED:";
-    _answer += stepper.speed();
-    break;
-
-    #ifdef DHT22
-      case 'k': // GET TEMPERATURE & HUMIDITY
-        _newPosition = _currentPosition; // non move command
-        humidityTemperatureReport();
+  else
+    {
+      switch(menu)
+    {
+      case 1: // SHUTTER SPEED CONTROL
+        //ShutterSpeedControl()
         break;
-    #endif
-
-  case 'X':  // GET STATUS - may not be needed
-  case 'x':
-    stepper.stop();
-    break;
-  
-  case 'Z':  // IDENTIFY
-  case 'z':  _answer += "GStouch";
-    PCMODE = true;
-    break;
-  default:
-    _answer += "GStouch";
-    break;
-  }
-
-  if (_newPosition != _currentPosition) {
-        // a move command was issued
-    Serial.print("MOVING:");
-    Serial.print(_newPosition);
-    Serial.println("#");
-    //
-    stepper.moveTo(_newPosition);
-    stepper.runToPosition();
-    _answer += "POSITION:";
-    _answer += stepper.currentPosition();
-  }
-
-  Serial.print(_answer);
-  Serial.println("#");
-}
-
-/**
-* handler for the serial communicationes
-* calls the SerialCommand whenever a new command is received
-*/
-void serialEvent() {
-  while (Serial.available()) {
-    char inChar = (char)Serial.read();
-    inputString += inChar;
-    if (inChar == '\n') {
-      serialCommand(inputString);
-      inputString = "";
+      case 2: // INTERVAL CONTROL
+        //IntervalControl();
+        break;
+      case 3: // REPEAT TIME CONTROL
+        //RepeatTimeControl();
+        break;
     }
   }
 }
 
-/**
-* for DHT routine
-*/
-#ifdef DHT22_
-  void humidityTemperatureReport() {
-    chkSensor = digitalRead(DHT22_PIN);
-    Temperature = String(dht.readTemperature(),1);
-    Humidity = String(dht.readHumidity(),1);
-    switch (chkSensor) {
-    case 1:
-      Serial.print("TEMPERATURE:");
-      Serial.print(Temperature);
-      Serial.println("#");
-      delay(50);
-      Serial.print("HUMIDITY:");
-      Serial.print(Humidity);
-      Serial.println("#");
-      delay(50);
-      break;
-    case 0:
-      Serial.print("TEMPERATURE:");
-      Serial.print("CHECKSUMERROR");
-      Serial.println("#");
-      Serial.print("HUMIDITY:");
-      Serial.print("CHECKSUMERROR");
-      Serial.println("#");
-      break;
-    default:
-      Serial.print("TEMPERATURE:");
-      Serial.print("UNKNOWNERROR");
-      Serial.println("#");
-      Serial.print("HUMIDITY:");
-      Serial.print("UNKNOWNERROR");
-      Serial.println("#");
-      break;
-    }
+void U8G_start()
+  {
+    u8g.setFont(u8g_font_5x8);
+    u8g.setColorIndex(1);
+    u8g.setFontPosTop();
   }
-#endif
+
+void draw()
+  {
+    u8g.firstPage();   
+    do {
+            u8g.setFont(u8g_font_unifont); u8g.setFontPosTop();
+            u8g.drawStr(20,0,"Setting");
+            u8g.drawStr(0,28,"SHUTTER : ");
+            u8g.setPrintPos(90,28);
+            u8g.print(val_shutterspeed_ms);
+            u8g.drawStr(0,50,"INTERVAL:");
+            u8g.setPrintPos(90,50);
+            u8g.print(val_interval_ms);
+        } 
+      while( u8g.nextPage() );
+  }
