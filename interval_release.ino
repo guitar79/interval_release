@@ -11,7 +11,9 @@ String firmware_Ver = "0.1" ;
 void setup() 
   {
     Serial.begin(115200);
-    Serial.println("GS-interval_release#");
+    Serial.print(firmware_Name);
+    Serial.print(": ");
+    Serial.println(firmware_Ver);
     U8G_start();
     pinset();
     draw();
