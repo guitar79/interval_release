@@ -20,19 +20,18 @@ void RunRelease()
     pinMode(shutter1, OUTPUT); pinMode(shutter2, OUTPUT);
     digitalWrite(shutter1, HIGH); digitalWrite(shutter2, HIGH);   // turn the LED on (HIGH is the voltage level)
     delay(val_shutterspeed_ms);                       // wait for a second
-    digitalWrite(shutter1, LOW);   // turn the LED on (HIGH is the voltage level)
-    digitalWrite(shutter2, LOW);   // turn the LED on (HIGH is the voltage level)
+    digitalWrite(shutter1, LOW); digitalWrite(shutter2, LOW);   // turn the LED on (HIGH is the voltage level)
     delay(val_interval_ms); // wait for a second
     shooting++;
-    Serial.print("Shootint #: ");
+    Serial.print("Shooting #: ");
     Serial.print(shooting);
-    Serial.print("    during time : ");
+    Serial.print("    running time : ");
     Serial.println(millis());
   }
 
 void WaitForRun() 
   {
-    Serial.print("Shootint #: ");
+    Serial.print("Shooting #: ");
     Serial.print(shooting);
     Serial.print("    Waiting for running : ");
     Serial.println(millis());

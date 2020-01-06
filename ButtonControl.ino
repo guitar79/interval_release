@@ -5,10 +5,9 @@
 #define LEFTpin A0
 
 //about button switch
-short S[4]={0}; 
 short now[4]={1}; 
-short was[4]={0};
 short run_status = 0;
+
 //설정된 핀번호 풀업저항으로 선언
 void pinset() 
   {
