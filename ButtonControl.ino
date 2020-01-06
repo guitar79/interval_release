@@ -47,31 +47,6 @@ void ButtonJudge()
     Serial.println(run_status); 
   }
 
-void ButtonJudge1()
-  {
-    now[0] = digitalRead(LEFTpin);
-    now[1] = digitalRead(RIGHTpin);
-    now[2] = digitalRead(UPpin);
-    now[3] = digitalRead(DOWNpin);
-    for(int i=0; i<4; i++)
-      {
-        if(now[i] != was[i] && now[i] == 0) 
-          S[i] = 1; 
-        else 
-          S[i] = 0;
-          was[i] = now[i];
-      }
-    Serial.print(now[0]); 
-    Serial.print(now[1]); 
-    Serial.print(now[2]); 
-    Serial.print(now[3]); 
-    Serial.print("    "); 
-    Serial.print(S[0]); 
-    Serial.print(S[1]); 
-    Serial.print(S[2]); 
-    Serial.println(S[3]);
-  }
-
 void ButtonAction()
   {
     ButtonJudge();
