@@ -32,9 +32,9 @@ void ButtonJudge()
     now[1] = digitalRead(RIGHTpin);
     now[2] = digitalRead(UPpin);
     now[3] = digitalRead(DOWNpin);
-    if(now[1] == 1 && run_status == 0) 
+    if(now[1] == 1 && now[2] == 1 && run_status == 0) //위쪽+오른쪽 동시에 누르면 시작
       run_status = 1; 
-    else if  (now[0] == 1 && run_status == 1) 
+    else if  (now[0] == 1 && now[2] == 1 ) //위쪽+왼쪽 동시에 누르면 정지
       run_status = 0; 
     Serial.print("button status: "); 
     Serial.print(now[0]); 

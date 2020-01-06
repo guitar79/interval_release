@@ -19,7 +19,7 @@ void RunRelease()
   {
     pinMode(shutter1, OUTPUT); pinMode(shutter2, OUTPUT);
     digitalWrite(shutter1, HIGH); digitalWrite(shutter2, HIGH);   // turn the LED on (HIGH is the voltage level)
-    delay(val_shutterspeed_ms);                       // wait for a second
+    delay(val_shutterspeed_ms); // shutter speed
     digitalWrite(shutter1, LOW); digitalWrite(shutter2, LOW);   // turn the LED on (HIGH is the voltage level)
     delay(val_interval_ms); // wait for a second
     shooting++;
